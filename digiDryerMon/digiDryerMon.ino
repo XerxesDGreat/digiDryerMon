@@ -35,7 +35,8 @@
 // VARS Begin                                                    //
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= //
 char mcuHostName[64]; 
-char sctTopic[96];    
+char sctTopic[96];  
+char uptimeTopic[96];  
 char lwtTopic[96];  
 char buildTopic[96];
 char rssiTopic[96];
@@ -43,6 +44,7 @@ char sSCTcur[5];
 char sSCTcurTemp[5]; 
 unsigned long wifiLoopNow = 0;
 int mqttTryCount = 0;
+int uptime = 0;
 
 float sctDiff = 0.1;  // difference in current to trigger a MQTT publish
 // -+-+
@@ -123,6 +125,11 @@ void connectToMqtt() {
     ESP.restart();      
   }  
 }
+
+void publishToMQTT(String topic, String message) {
+	mqttClient.publish(topic.c_str(), mqttQOSLevel, true, message.c_str());
+}
+
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= //
 bool checkBoundSensor(float newValue, float prevValue, float maxDiff) {
   return newValue < prevValue - maxDiff || newValue > prevValue + maxDiff;
@@ -144,10 +151,12 @@ void checkSCT()
     dtostrf(sctCur, 2, 2, sSCTcur);
     debugLn(F("SCT: Publish new value via MQTT"));
     digitalWrite(intLED1Pin, LEDon);
-    mqttClient.publish(sctTopic, mqttQOSLevel, false, String(sSCTcur).c_str());   
+    publishToMQTT(sctTopic, String(sSCTcur));
     digitalWrite(intLED1Pin, LEDoff);     
   }
-}  
+  uptime = millis() / 1000;
+  publishToMQTT(uptimeTopic, String(uptime));
+}
 
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= //
 // onMqttConnect                                                 //
@@ -155,7 +164,7 @@ void checkSCT()
 void onMqttConnect(bool sessionPresent) {
   debugLn(F("MQTT: Connected"));
   mqttTryCount = 0;
-  mqttClient.publish(lwtTopic, 2, true, mqttBirth);
+  publishToMQTT(lwtTopic, mqttBirth);
   // Setup Sensor Polling
   sctTick.attach(sctPoll, checkSCT);
   rePushTick.attach(rePushPoll, rePushVals);
@@ -206,6 +215,7 @@ void setup() {
   // ~~~~ Set MQTT Topics
   sprintf_P(lwtTopic, PSTR("%s/LWT"), mcuHostName);
   sprintf_P(sctTopic, PSTR("%s/SCT"), mcuHostName);
+  sprintf_P(uptimeTopic, PSTR("%s/UPTIME"), mcuHostName);
   sprintf_P(rssiTopic, PSTR("%s/RSSI"), mcuHostName);
   sprintf_P(buildTopic, PSTR("%s/BUILD"), mcuHostName);
  
@@ -272,6 +282,11 @@ void setup() {
     delay(100);
     ESP.restart();
   });
+  httpServer.on("/", []() {
+  	debugLn(F("HTTP: standard request received."));
+  	httpServer.sendHeader("Access-Control-Allow-Origin", "*");
+  	httpServer.send(200, "text/plain", String(uptime));
+  });
   
   httpServer.begin();
   debugLn(F("ESP: Boot completed - Starting main loop"));
@@ -281,9 +296,10 @@ void setup() {
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= //
 void rePushVals() {
     debugLn(F("ESP: RePushingVals to MQTT"));
-    mqttClient.publish(sctTopic, mqttQOSLevel, false, String(sSCTcurTemp).c_str());      
-    mqttClient.publish(rssiTopic, mqttQOSLevel, false, String(WiFi.RSSI()).c_str()); 
-    mqttClient.publish(buildTopic, mqttQOSLevel, false, String(String(F("digiDryerMon - Build: ")) + F(__DATE__) + " " +  F(__TIME__) + " - " + WiFi.localIP().toString()).c_str()); 
+    publishToMQTT(sctTopic, String(sSCTcurTemp));
+    publishToMQTT(rssiTopic, String(WiFi.RSSI())); 
+    publishToMQTT(buildTopic, String(String(F("digiDryerMon - Build: ")) + F(__DATE__) + " " +  F(__TIME__) + " - " + WiFi.localIP().toString())); 
+    publishToMQTT(uptimeTopic, String(uptime));
 }
 
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-= //
@@ -355,8 +371,8 @@ void loop() {
     if (WiFi.isConnected() && mqttClient.connected()) {
       checkSCT();
       delay(20);
-      mqttClient.publish(rssiTopic, mqttQOSLevel, false, String(WiFi.RSSI()).c_str()); 
-      mqttClient.publish(buildTopic, mqttQOSLevel, false, String(String(F("digiDryerMon - Build: ")) + F(__DATE__) + " " +  F(__TIME__) + " - " + WiFi.localIP().toString()).c_str()); 
+      publishToMQTT(rssiTopic, String(WiFi.RSSI())); 
+      publishToMQTT(buildTopic, String(String(F("digiDryerMon - Build: ")) + F(__DATE__) + " " +  F(__TIME__) + " - " + WiFi.localIP().toString())); 
       debugLn(String(F("MQTT: digiDryerMon - Build: ")) + F(__DATE__) + " " +  F(__TIME__) + " - " + WiFi.localIP().toString());
     } 
   }
