@@ -3,6 +3,25 @@ ESP8266 based washer/dryer current monitoring via a split core current transform
 
 Video Demostration and Setup - https://www.youtube.com/watch?v=1tqJkw5f0iA
 
+### Words if you don't wanna go to YouTube
+#### Boards
+- Open Preferences
+- Add ESP8266 url (http://arduino.esp8266.com/stable/package_esp8266com_index.json) to "Additional Boards Manager Urls"
+- Close Preferences
+- Open Boards Manager
+- Find "esp8266" and install it
+- Close Boards Manager
+- In Tools > Board > ESP8266 Boards, select "WEMOS D1 Mini (clone)
+
+#### Application
+- Download or clone this repository
+- Open digiDryerMon/digiDryerMon.ino in Arduino IDE
+
+#### Libs
+- Navigate to https://github.com/marvinroger/async-mqtt-client/releases and download the latest release .zip file
+- Navigate to https://github.com/me-no-dev/ESPAsyncTCP and click Code > Download ZIP
+- In Arduino IDE, Sketch > Include Library > Add ZIP Library, then select each of the zip files above in turn
+
 ### Parts List
 [Split Core Current Transformer](https://amzn.to/2XDcnoX)  
 [Wemos D1 Mini](https://amzn.to/2Z44jNS)  
